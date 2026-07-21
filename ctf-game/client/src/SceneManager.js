@@ -228,6 +228,10 @@ export class SceneManager {
 
     }
 
+    addPlayer(playerInstance){
+        this.scene.add(playerInstance.mesh);
+    }
+
     render(scene) {
 
         try {
