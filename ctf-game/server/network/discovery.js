@@ -1,8 +1,9 @@
 import dgram from 'node:dgram';
 import readline from 'node:readline';
+import net from 'node:net';
 
 const DISCOVERY_PORT = 8888;
-const BROADCAST_ADRESS = '255.255.255.255';
+const BROADCAST_ADDRESS = '255.255.255.255';
 
 // Interface to interact with the terminal (show list and manual option)
 const rl = readline.createInterface({
@@ -119,8 +120,36 @@ function promptUserSelection(client, broadcastInterval) {
 }
 
 function initTcpGameConnection(ip, tcpPort) {
-    console.log(`[Siguiente paso listo] Proceder a abrir socket TCP hacia ${ip}:${tcpPort}`);
-    // Aquí implementaremos la conexión TCP y el envío del mensaje "join" en el siguiente bloque de código.
+    console.log(`Conectando por TCP a ${ip}:${tcpPort}...`);
+
+    const clientSocket = new net.Socket();
+    let playerName = "Jugador_" + Math.floor(Math.random() * 1000);
+
+    clientSocket.connect(tcpPort, ip, () => {
+        console.log("¡Conectado al servidor de juego! Enviando paquete 'join'...");
+
+        // Protocol Join Message
+        const joinMessage = JSON.stringify({
+            type: "join",
+            v: 1,
+            name: playerName
+        }) + '\n';
+
+        clientSocket.write(joinMessage);
+    });
+
+    clientSocket.on('data', (data) => {
+        // Here we will receive the welcome message from the server
+        console.log("Mensaje del servidor:", data.toString('utf8'));
+    });
+
+    clientSocket.on('close', () => {
+        console.log("Conexión cerrada con el servidor.");
+    });
+
+    clientSocket.on('error', (err) => {
+        console.error("Error en la conexión TCP:", err.message);
+    });
 }
 
 // Execute discovery
