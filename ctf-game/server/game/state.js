@@ -1,10 +1,10 @@
-import { 
-    MAP_SIZE, 
-    PLAYER_RADIUS, 
-    INTERACT_RADIUS, 
-    SPEED, 
-    getNewPosition, 
-    calculateDistance 
+import {
+    MAP_SIZE,
+    PLAYER_RADIUS,
+    INTERACT_RADIUS,
+    SPEED,
+    getNewPosition,
+    calculateDistance
 } from './validator.js';
 
 export class GameState {
@@ -24,6 +24,9 @@ export class GameState {
 
         this.phase = 'lobby'; // 'lobby', 'countdown', 'playing', 'finished'
         this.winner = null;
+
+        // Countdown duration (seconds)
+        this.countdown = 3;
     }
 
     // Add a new player to the game state
@@ -45,12 +48,14 @@ export class GameState {
             this.flag.owner = null;
             this.flag.version++;
         }
+
         this.players.delete(id);
     }
 
     // Update player intent direction
     setPlayerInput(id, dirX, dirY) {
         const player = this.players.get(id);
+
         if (player) {
             player.dir = { x: dirX, y: dirY };
         }
@@ -58,12 +63,70 @@ export class GameState {
 
     // Main tick update loop (runs 20 times per second)
     update(deltaTime = 1 / this.TICK_RATE) {
-        if (this.phase !== 'playing') return;
+
+        switch (this.phase) {
+
+            case 'lobby':
+                this.updateLobby();
+                break;
+
+            case 'countdown':
+                this.updateCountdown(deltaTime);
+                break;
+
+            case 'playing':
+                this.updatePlaying(deltaTime);
+                break;
+
+            case 'finished':
+                // Nothing to update yet
+                break;
+        }
+    }
+
+    // Lobby logic
+    updateLobby() {
+
+        // For testing, start when at least one player joins.
+        // Later you can change this to >= 2 if required.
+        if (this.players.size >= 1) {
+
+            this.phase = 'countdown';
+            this.countdown = 3;
+
+            console.log("Countdown started.");
+
+        }
+    }
+
+    // Countdown logic
+    updateCountdown(deltaTime) {
+
+        this.countdown -= deltaTime;
+
+        if (this.countdown <= 0) {
+
+            this.phase = 'playing';
+
+            console.log("Game started!");
+
+        }
+    }
+
+    // Main gameplay update
+    updatePlaying(deltaTime) {
 
         // 1 Update positions of all players using validator's safe movement function
         for (const [id, player] of this.players.entries()) {
+
             if (player.dir.x !== 0 || player.dir.y !== 0) {
-                const newPos = getNewPosition({ x: player.x, y: player.y }, player.dir, deltaTime);
+
+                const newPos = getNewPosition(
+                    { x: player.x, y: player.y },
+                    player.dir,
+                    deltaTime
+                );
+
                 player.x = newPos.x;
                 player.y = newPos.y;
             }
@@ -71,61 +134,84 @@ export class GameState {
 
         // 2 Update flag position if it is owned by a player
         if (this.flag.owner) {
+
             const carrier = this.players.get(this.flag.owner);
+
             if (carrier) {
+
                 this.flag.x = carrier.x;
                 this.flag.y = carrier.y;
 
                 // 3 Evaluate Victory Condition using validator's distance calculator
                 const distanceFromCenter = calculateDistance(
-                    { x: carrier.x, y: carrier.y }, 
+                    { x: carrier.x, y: carrier.y },
                     { x: this.CENTRAL_COORD, y: this.CENTRAL_COORD }
                 );
 
                 if (distanceFromCenter > this.CIRCLE_RADIUS) {
+
                     this.phase = 'finished';
                     this.winner = carrier.id;
+
+                    console.log(`Game finished! Winner: ${carrier.name}`);
+
                 }
+
             } else {
+
+                // Flag carrier disconnected
                 this.flag.owner = null;
                 this.flag.x = this.CENTRAL_COORD;
                 this.flag.y = this.CENTRAL_COORD;
+                this.flag.version++;
+
             }
         }
     }
 
     // Handle interact request (grab free flag or steal from carrier)
     handleInteract(playerId) {
+
         if (this.phase !== 'playing') return false;
 
         const player = this.players.get(playerId);
+
         if (!player) return false;
 
         const distance = calculateDistance(
-            { x: player.x, y: player.y }, 
+            { x: player.x, y: player.y },
             { x: this.flag.x, y: this.flag.y }
         );
 
         if (distance <= INTERACT_RADIUS) {
+
             if (this.flag.owner === null) {
+
                 this.flag.owner = playerId;
                 this.flag.version++;
+
                 return true;
+
             } else if (this.flag.owner !== playerId) {
+
                 this.flag.owner = playerId;
                 this.flag.version++;
+
                 return true;
+
             }
         }
+
         return false;
     }
 
     // Export state snapshot for state synchronization messages
     getStateSnapshot() {
-        const playersArray = Array.from(this.players.values()).map(p => ({
-            id: p.id,
-            x: Number(p.x.toFixed(1)),
-            y: Number(p.y.toFixed(1))
+
+        const playersArray = Array.from(this.players.values()).map(player => ({
+            id: player.id,
+            x: Number(player.x.toFixed(1)),
+            y: Number(player.y.toFixed(1))
         }));
 
         return {

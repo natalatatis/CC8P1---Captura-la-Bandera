@@ -42,14 +42,5 @@ udpServer.on('message', (msg, rinfo) => {
 //  Main Game Loop (20 ticks per second)
 const TICK_INTERVAL = 1000 / gameState.TICK_RATE;
 setInterval(() => {
-    //FOR TESTING
-    // Si estamos en lobby y hay al menos 1 jugador (o los que requieras), puedes iniciar countdown opcionalmente
-   // if (gameState.phase === 'lobby' && gameState.players.size > 0) {
-    //    // Para pruebas rápidas locales, pasamos a 'playing' directamente o manejas countdown
-        gameState.phase = 'playing'; 
-  //  }
-
     gameState.update(1 / gameState.TICK_RATE);
-
-    // Aquí puedes emitir el snapshot de estado por TCP a todos los clientes conectados si implementas broadcasting
 }, TICK_INTERVAL);
