@@ -124,11 +124,12 @@ function initTcpGameConnection(ip, tcpPort) {
 
     const clientSocket = new net.Socket();
     let playerName = "Jugador_" + Math.floor(Math.random() * 1000);
+    let myPlayerId = null; // To keep track of  assigned ID
 
     clientSocket.connect(tcpPort, ip, () => {
         console.log("¡Conectado al servidor de juego! Enviando paquete 'join'...");
 
-        // Protocol Join Message
+        // 1. Send the join message
         const joinMessage = JSON.stringify({
             type: "join",
             v: 1,
@@ -138,9 +139,29 @@ function initTcpGameConnection(ip, tcpPort) {
         clientSocket.write(joinMessage);
     });
 
+    // 2. LISTEN FOR SERVER STATE UPDATES (TCP data)
     clientSocket.on('data', (data) => {
-        // Here we will receive the welcome message from the server
-        console.log("Mensaje del servidor:", data.toString('utf8'));
+        // Servers can bundle multiple json messages in one chunk, split by newline
+        const messages = data.toString('utf8').trim().split('\n');
+
+        for (const rawMsg of messages) {
+            if (!rawMsg) continue;
+            const msg = JSON.parse(rawMsg);
+
+            if (msg.type === 'welcome') {
+                myPlayerId = msg.player_id;
+                console.log(`¡Bienvenido! Mi ID de jugador es: ${myPlayerId}`);
+            } 
+            else if (msg.type === 'state') {
+                // Here is where the server broadcasts player coordinates and flag data 20 times a second!
+                console.log("Estado recibido del servidor:", msg);
+                
+
+            }
+            else if (msg.type === 'error') {
+                console.error("Error del servidor:", msg.reason);
+            }
+        }
     });
 
     clientSocket.on('close', () => {

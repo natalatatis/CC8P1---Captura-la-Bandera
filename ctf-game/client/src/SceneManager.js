@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { Flag } from './Flag.js';
 
 export class SceneManager {
     constructor() {
@@ -36,6 +37,10 @@ export class SceneManager {
         // Build the map
         this.addMapVisuals();
 
+        // Initialize and add the Flag automatically
+        this.flag = new Flag();
+        this.addFlag(this.flag);
+
         // Handle resizing
         window.addEventListener("resize", () => {
             this.camera.aspect = window.innerWidth / window.innerHeight;
@@ -52,6 +57,28 @@ export class SceneManager {
             y: 0,
             z: -(logicalY - 500) // Y in protocol is Z in 3D, and Y grows downward
         };
+    }
+
+    // Add flag
+    addFlag(flagInstance) {
+        this.scene.add(flagInstance.mesh);
+    }
+
+    // Update flag position and state based on server state data
+    updateFlag(logicalX, logicalY, ownerId) {
+        if (this.flag) {
+            const pos = this.toThreeCoords(logicalX, logicalY);
+            this.flag.mesh.position.set(pos.x, 0, pos.z);
+
+            // Change banner color based on whether it has an owner
+            if (ownerId !== null) {
+                this.flag.bannerMaterial.color.setHex(0x3b82f6); // Blue when carried
+                this.flag.bannerMaterial.emissive.setHex(0x1e3a8a);
+            } else {
+                this.flag.bannerMaterial.color.setHex(0xeab308); // Gold when free
+                this.flag.bannerMaterial.emissive.setHex(0x332200);
+            }
+        }
     }
 
     // Add sunset lighting
@@ -232,11 +259,11 @@ export class SceneManager {
         this.scene.add(playerInstance.mesh);
     }
 
-    render(scene) {
+    render() {
 
         try {
 
-            this.renderer.render(scene, this.camera);
+            this.renderer.render(this.scene, this.camera);
 
         } catch (error) {
 
