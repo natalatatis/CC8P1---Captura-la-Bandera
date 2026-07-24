@@ -7,6 +7,10 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
+    "server": "node server/index.js",
+    "bridge": "node server/network/bridge.js",
+    "cli-client": "node server/network/discovery.js",
+    "test:bridge": "node test-bridge.mjs",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "keywords": [],
@@ -16,6 +20,7 @@
     "three": "^0.185.1"
   },
   "devDependencies": {
-    "vite": "^8.1.5"
+    "vite": "^8.1.5",
+    "ws": "^8.18.0"
   }
 }
