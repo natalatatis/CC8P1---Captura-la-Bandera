@@ -201,23 +201,17 @@ export class SceneManager {
         }
 
         for (let z = -520; z <= 520; z += 45) {
-
             this.createTree(-560, z);
             this.createTree(560, z);
-
         }
 
         // Random forest outside the playable area
 
         for (let i = 0; i < 200; i++) {
-
             let x, z;
-
             do {
-
                 x = Math.random() * 2400 - 1200;
                 z = Math.random() * 2400 - 1200;
-
             } while (
                 x > -540 &&
                 x < 540 &&
@@ -226,7 +220,6 @@ export class SceneManager {
             );
 
             this.createTree(x, z);
-
         }
 
         // Add a large ground outside the playable area
@@ -248,27 +241,23 @@ export class SceneManager {
 
     // Update the position
     updateObjectPosition(mesh, logicalX, logicalY) {
-
         const pos = this.toThreeCoords(logicalX, logicalY);
-
         mesh.position.set(pos.x, 1, pos.z);
-
     }
 
     addPlayer(playerInstance){
         this.scene.add(playerInstance.mesh);
     }
 
+    removePlayer(playerInstance) {
+        this.scene.remove(playerInstance.mesh);
+    }
+
     render() {
-
         try {
-
             this.renderer.render(this.scene, this.camera);
-
         } catch (error) {
-
             console.error("Rendering error:", error);
-
         }
 
     }
