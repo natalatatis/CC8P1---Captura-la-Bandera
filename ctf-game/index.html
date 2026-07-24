@@ -1,9 +1,37 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <link rel="stylesheet" href="style/main.css">
+    <meta charset="utf-8" />
+    <title>CTF</title>
+    <link rel="stylesheet" href="client/style/main.css">
 </head>
 <body>
+    <div id="menu">
+        <h1>Capturar la Bandera</h1>
+
+        <label>Tu nombre</label>
+        <input id="playerName" type="text" maxlength="20" placeholder="Jugador" />
+
+        <h2>Servidores encontrados</h2>
+        <ul id="serverList"></ul>
+        <p id="serverListEmpty">Buscando servidores en la red local...</p>
+
+        <h2>Conexión manual</h2>
+        <div class="manualRow">
+            <input id="manualIp" type="text" placeholder="IP (ej. 192.168.1.10)" />
+            <input id="manualPort" type="text" placeholder="Puerto TCP (ej. 8889)" />
+            <button id="manualConnectBtn">Conectar</button>
+        </div>
+
+        <p id="menuStatus"></p>
+    </div>
+
+    <div id="hud" class="hidden">
+        <div id="countdownOverlay" class="hidden"></div>
+        <div id="gameOverOverlay" class="hidden"></div>
+        <div id="lobbyInfo" class="hidden"></div>
+    </div>
+
     <script type="module" src="client/src/main.js"></script>
 </body>
 </html>
