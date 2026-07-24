@@ -1,4 +1,3 @@
-
 export class NetworkClient {
     constructor(bridgeUrl = 'ws://localhost:8890') {
         this.handlers = {};
@@ -14,6 +13,7 @@ export class NetworkClient {
             } catch {
                 return;
             }
+            if (msg && msg.type !== 'state') console.log('[Network] <-', msg); // 'state' is too frequent to log
             if (msg && typeof msg.type === 'string') this._emit(msg.type, msg);
         });
     }
@@ -52,6 +52,7 @@ export class NetworkClient {
     }
 
     interact() {
+        console.log('[Network] sending interact');
         this._send({ type: 'interact' });
     }
 }

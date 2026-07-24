@@ -85,3 +85,27 @@ canvas { display: block; }
     padding: 8px 12px;
     border-radius: 6px;
 }
+
+#grabPrompt {
+    position: absolute;
+    bottom: 40px;
+    left: 50%;
+    transform: translateX(-50%);
+    font-size: 1.1rem;
+    background: rgba(0,0,0,0.55);
+    padding: 10px 18px;
+    border-radius: 8px;
+    border: 1px solid #4da3ff;
+}
+
+#carryingBanner {
+    position: absolute;
+    top: 16px;
+    left: 50%;
+    transform: translateX(-50%);
+    font-size: 1.2rem;
+    font-weight: bold;
+    background: rgba(59, 130, 246, 0.85);
+    padding: 10px 20px;
+    border-radius: 8px;
+}

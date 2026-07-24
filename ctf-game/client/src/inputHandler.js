@@ -1,5 +1,8 @@
 export class InputHandler {
-    constructor() {
+    constructor(onInteract) {
+        // Callback executed when the interact key is pressed
+        this.onInteract = onInteract;
+
         this.keys = {
             w: false,
             a: false,
@@ -12,11 +15,34 @@ export class InputHandler {
     }
 
     handleKey(e, isDown) {
+        // Press E to interact (grab/steal the flag)
+        if ( isDown &&(e.key.toLowerCase() === 'e' || e.code === 'Space') ) {
+            this.onInteract?.();
+            return;
+        }
+
+
+        // Keep the existing movement mapping
         switch (e.key.toLowerCase()) {
-            case 'w': case 'arrowup': this.keys.w = isDown; break;
-            case 'a': case 'arrowleft': this.keys.a = isDown; break;
-            case 's': case 'arrowdown': this.keys.s = isDown; break;
-            case 'd': case 'arrowright': this.keys.d = isDown; break;
+            case 's':
+            case 'arrowdown':
+                this.keys.w = isDown;
+                break;
+
+            case 'a':
+            case 'arrowleft':
+                this.keys.a = isDown;
+                break;
+
+            case 'w':
+            case 'arrowup':
+                this.keys.s = isDown;
+                break;
+
+            case 'd':
+            case 'arrowright':
+                this.keys.d = isDown;
+                break;
         }
     }
 

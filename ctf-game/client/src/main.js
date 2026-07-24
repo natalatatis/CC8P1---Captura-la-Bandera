@@ -16,6 +16,8 @@ const menuStatusEl = document.getElementById('menuStatus');
 const countdownEl = document.getElementById('countdownOverlay');
 const gameOverEl = document.getElementById('gameOverOverlay');
 const lobbyInfoEl = document.getElementById('lobbyInfo');
+const grabPromptEl = document.getElementById('grabPrompt');
+const carryingBannerEl = document.getElementById('carryingBanner');
 
 // ---- Game state ----
 let sceneManager = null;
@@ -23,6 +25,7 @@ let inputHandler = null;
 let myPlayerId = null;
 let config = null;
 const players = new Map(); // player_id -> Player instance
+const playerNames = new Map(); // player_id -> name (from 'lobby' broadcasts)
 let lastSentDir = { x: 0, y: 0 };
 let phase = 'lobby';
 
@@ -30,7 +33,7 @@ function setStatus(text) {
     menuStatusEl.textContent = text;
 }
 
-// ---- Bridge connection 
+// ---- Bridge connection (local only, see Network.js / bridge.js) ----
 const net = new NetworkClient('ws://localhost:8890');
 
 net.on('open', () => {
@@ -91,6 +94,11 @@ net.on('welcome', (msg) => {
 });
 
 net.on('lobby', (msg) => {
+    for (const p of msg.players) {
+        playerNames.set(p.id, p.name);
+        players.get(p.id)?.setName(p.name); // refresh nametag if already spawned
+    }
+
     if (!hudEl.classList.contains('hidden')) {
         lobbyInfoEl.classList.remove('hidden');
         lobbyInfoEl.textContent = `Lobby: ${msg.players.length} jugador(es) esperando`;
@@ -112,19 +120,41 @@ net.on('start', () => {
 net.on('state', (msg) => {
     syncPlayers(msg.players);
     if (sceneManager) {
-        sceneManager.updateFlag(msg.flag.x, msg.flag.y, msg.flag.owner);
+        sceneManager.updateFlag(msg.flag.x, msg.flag.y, msg.flag.owner, players);
     }
+    updateGrabPrompt(msg);
 });
+
+function updateGrabPrompt(msg) {
+    const iHaveFlag = msg.flag.owner === myPlayerId;
+    carryingBannerEl.classList.toggle('hidden', !iHaveFlag);
+
+    const me = msg.players.find(p => p.id === myPlayerId);
+    if (!me || iHaveFlag) {
+        grabPromptEl.classList.add('hidden');
+        return;
+    }
+    const radius = (config && config.interact_radius) || 40;
+    const dx = me.x - msg.flag.x;
+    const dy = me.y - msg.flag.y;
+    const dist = Math.sqrt(dx * dx + dy * dy);
+    grabPromptEl.classList.toggle('hidden', dist > radius);
+}
 
 net.on('game_over', (msg) => {
     phase = 'finished';
-    const winnerName = msg.winner === myPlayerId ? '¡Ganaste!' : `Ganó: ${msg.winner}`;
+    grabPromptEl.classList.add('hidden');
+    carryingBannerEl.classList.add('hidden');
+    const winnerName = msg.winner === myPlayerId
+        ? '¡Ganaste!'
+        : `Ganó: ${playerNames.get(msg.winner) || msg.winner}`;
     gameOverEl.classList.remove('hidden');
     gameOverEl.textContent = winnerName;
 });
 
 // ---- Scene / render setup, created once we've joined ----
 function startScene() {
+    document.activeElement?.blur();
     menuEl.classList.add('hidden');
     hudEl.classList.remove('hidden');
 
@@ -142,7 +172,7 @@ function syncPlayers(serverPlayers) {
         seen.add(p.id);
         let player = players.get(p.id);
         if (!player) {
-            player = new Player(p.id, p.id === myPlayerId);
+            player = new Player(p.id, p.id === myPlayerId, playerNames.get(p.id) || '');
             players.set(p.id, player);
             sceneManager.addPlayer(player);
         }

@@ -64,20 +64,38 @@ export class SceneManager {
         this.scene.add(flagInstance.mesh);
     }
 
-    // Update flag position and state based on server state data
-    updateFlag(logicalX, logicalY, ownerId) {
-        if (this.flag) {
+    // Update flag position and state based on server state data.
+    // `players` is the Map<id, Player> owned by main.js so that, when the
+    // flag is carried, we can attach the flag mesh as a child of the
+    // carrier's mesh — this glues it to the player with zero lag, instead
+    // of independently re-positioning it at the network tick rate.
+    updateFlag(logicalX, logicalY, ownerId, players = new Map()) {
+        if (!this.flag) return;
+
+        const carrier = ownerId !== null ? players.get(ownerId) : null;
+
+        if (carrier) {
+            if (this.flag.mesh.parent !== carrier.mesh) {
+                this.flag.mesh.parent?.remove(this.flag.mesh);
+                carrier.mesh.add(this.flag.mesh);
+                this.flag.mesh.position.set(0, 20, 0); // float just above the carrier
+            }
+        } else {
+            if (this.flag.mesh.parent !== this.scene) {
+                this.flag.mesh.parent?.remove(this.flag.mesh);
+                this.scene.add(this.flag.mesh);
+            }
             const pos = this.toThreeCoords(logicalX, logicalY);
             this.flag.mesh.position.set(pos.x, 0, pos.z);
+        }
 
-            // Change banner color based on whether it has an owner
-            if (ownerId !== null) {
-                this.flag.bannerMaterial.color.setHex(0x3b82f6); // Blue when carried
-                this.flag.bannerMaterial.emissive.setHex(0x1e3a8a);
-            } else {
-                this.flag.bannerMaterial.color.setHex(0xeab308); // Gold when free
-                this.flag.bannerMaterial.emissive.setHex(0x332200);
-            }
+        // Change banner appearance based on whether it has an owner
+        if (ownerId !== null) {
+            this.flag.bannerMaterial.color.setHex(0x3b82f6); // Blue when carried
+            this.flag.bannerMaterial.emissive.setHex(0x1e3a8a);
+        } else {
+            this.flag.bannerMaterial.color.setHex(0xeab308); // Gold when free
+            this.flag.bannerMaterial.emissive.setHex(0x332200);
         }
     }
 
@@ -201,17 +219,23 @@ export class SceneManager {
         }
 
         for (let z = -520; z <= 520; z += 45) {
+
             this.createTree(-560, z);
             this.createTree(560, z);
+
         }
 
         // Random forest outside the playable area
 
         for (let i = 0; i < 200; i++) {
+
             let x, z;
+
             do {
+
                 x = Math.random() * 2400 - 1200;
                 z = Math.random() * 2400 - 1200;
+
             } while (
                 x > -540 &&
                 x < 540 &&
@@ -220,6 +244,7 @@ export class SceneManager {
             );
 
             this.createTree(x, z);
+
         }
 
         // Add a large ground outside the playable area
@@ -241,8 +266,11 @@ export class SceneManager {
 
     // Update the position
     updateObjectPosition(mesh, logicalX, logicalY) {
+
         const pos = this.toThreeCoords(logicalX, logicalY);
+
         mesh.position.set(pos.x, 1, pos.z);
+
     }
 
     addPlayer(playerInstance){
@@ -254,10 +282,15 @@ export class SceneManager {
     }
 
     render() {
+
         try {
+
             this.renderer.render(this.scene, this.camera);
+
         } catch (error) {
+
             console.error("Rendering error:", error);
+
         }
 
     }
