@@ -1,29 +1,72 @@
 <!DOCTYPE html>
-<html>
+<html lang="es">
 <head>
     <meta charset="utf-8" />
-    <title>CTF</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Captura la Bandera</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Sora:wght@500;600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="client/style/main.css">
 </head>
 <body>
     <div id="menu">
-        <h1>Capturar la Bandera</h1>
+        <div class="blob blob-a"></div>
+        <div class="blob blob-b"></div>
 
-        <label>Tu nombre</label>
-        <input id="playerName" type="text" maxlength="20" placeholder="Jugador" />
+        <div class="card">
 
-        <h2>Servidores encontrados</h2>
-        <ul id="serverList"></ul>
-        <p id="serverListEmpty">Buscando servidores en la red local...</p>
+            <header class="card-header">
+                <h1>Captura la Bandera</h1>
+                <p class="subtitle">Elige un servidor en tu red o conéctate manualmente para unirte a la partida.</p>
+            </header>
 
-        <h2>Conexión manual</h2>
-        <div class="manualRow">
-            <input id="manualIp" type="text" placeholder="IP (ej. 192.168.1.10)" />
-            <input id="manualPort" type="text" placeholder="Puerto TCP (ej. 8889)" />
-            <button id="manualConnectBtn">Conectar</button>
+            <section class="block">
+                <label class="field-label" for="playerName">Tu nombre</label>
+                <input id="playerName" class="field-input" type="text" maxlength="20" placeholder="¿Cómo te llamas?" autocomplete="off" />
+            </section>
+
+            <section class="block">
+                <div class="block-heading">
+                    <span class="block-label">Servidores en tu red</span>
+                    <span id="scanIndicator" class="scan-indicator">
+                        <span class="scan-dot"></span> buscando
+                    </span>
+                </div>
+
+                <ul id="serverList" class="server-list"></ul>
+                <p id="serverListEmpty" class="empty-hint">Todavía no encontramos ningún servidor.</p>
+
+                <details class="manual-toggle">
+                    <summary>¿No aparece tu servidor? Conectar manualmente</summary>
+                    <div class="manualRow">
+                        <input id="manualIp" class="field-input mono" type="text" placeholder="IP, ej. 192.168.1.10" />
+                        <input id="manualPort" class="field-input mono" type="text" placeholder="Puerto, ej. 8889" />
+                        <button id="manualConnectBtn" class="btn btn-secondary">Conectar</button>
+                    </div>
+                </details>
+
+                <p id="menuStatus" class="status-line"></p>
+            </section>
+
+            <section class="block">
+                <div class="block-heading">
+                    <span class="block-label">Jugadores en la sala</span>
+                    <span id="squadCount" class="squad-count">0</span>
+                </div>
+
+                <ul id="squadRoster" class="squad-roster"></ul>
+
+                <div id="hostControls" class="host-controls hidden">
+                    <button id="startGameBtn" class="btn btn-primary">Iniciar partida</button>
+                </div>
+
+                <p id="waitingForHost" class="status-line waiting-line hidden">
+                    <span class="pulse-dot"></span> Esperando a que el anfitrión inicie la partida
+                </p>
+            </section>
+
         </div>
-
-        <p id="menuStatus"></p>
     </div>
 
     <div id="hud" class="hidden">
