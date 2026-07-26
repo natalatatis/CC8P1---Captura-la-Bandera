@@ -1,3 +1,11 @@
+// client/src/Network.js
+//
+// This talks ONLY to our own local bridge (server/network/bridge.js) on
+// localhost, using the browser's built-in WebSocket — not the `ws` package,
+// and not the class protocol's transport. The real join/input/interact/
+// state/... messages that travel to the actual CTF server are carried
+// exactly as specified (TCP, JSON, '\n' framing) by the bridge, not by this
+// file. See bridge.js for the full explanation.
 export class NetworkClient {
     constructor(bridgeUrl = 'ws://localhost:8890') {
         this.handlers = {};
@@ -13,7 +21,6 @@ export class NetworkClient {
             } catch {
                 return;
             }
-            if (msg && msg.type !== 'state') console.log('[Network] <-', msg); // 'state' is too frequent to log
             if (msg && typeof msg.type === 'string') this._emit(msg.type, msg);
         });
     }
@@ -52,7 +59,6 @@ export class NetworkClient {
     }
 
     interact() {
-        console.log('[Network] sending interact');
         this._send({ type: 'interact' });
     }
 }

@@ -1,8 +1,11 @@
 import net from 'node:net';
 import crypto from 'node:crypto';
 import { MessageParser } from '../../protocol/parser.js';
+import { MESSAGE_MAX_SIZE, NAME_MAX_LENGTH } from '../game/validator.js';
 
-const MESSAGE_MAX_SIZE = 64 * 1024; // 64 KB
+// Control characters and line breaks are not allowed in names (section 6.2 /
+// join field rules). Matches C0 control chars + DEL.
+const CONTROL_CHARS_RE = /[\u0000-\u001F\u007F]/;
 
 function sendMsg(socket, obj) {
     if (!socket.destroyed) socket.write(JSON.stringify(obj) + '\n');
@@ -11,7 +14,7 @@ function sendMsg(socket, obj) {
 export function createGameServer(gameState) {
     // Tracks every connected socket by player_id so the server can broadcast
     // lobby / countdown / start / state / game_over to everyone, as required
-    // by the protocol's message catalog 
+    // by the protocol's message catalog (section 2.3).
     const sockets = new Map();
 
     function broadcast(obj) {
@@ -29,8 +32,8 @@ export function createGameServer(gameState) {
         let playerId = null;
 
         socket.on('data', (chunk) => {
-            // 5.1: mensajes que superen el tamaño máximo permitido se rechazan
-            // y la conexión se cierra.
+            // 2.1 / 6.2: any message over message_max_size (64 KB, including
+            // the trailing \n) is rejected and the TCP connection is closed.
             if (parser.buffer.length + chunk.length > MESSAGE_MAX_SIZE) {
                 sendMsg(socket, { type: 'error', reason: 'MESSAGE_TOO_LARGE' });
                 socket.end();
@@ -47,33 +50,51 @@ export function createGameServer(gameState) {
 
                 switch (msg.type) {
                     case 'join': {
+                        // A second join on the same connection: rejected,
+                        // connection stays open (section 2.3.2).
                         if (playerId) {
                             sendMsg(socket, { type: 'error', reason: 'INVALID_PHASE' });
                             break;
                         }
-                        if (gameState.phase !== 'lobby') {
-                            sendMsg(socket, { type: 'error', reason: 'INVALID_PHASE' });
-                            break;
-                        }
+
+                        // Protocol version must be exactly 1.
                         if (msg.v !== 1) {
                             sendMsg(socket, { type: 'error', reason: 'VERSION_MISMATCH' });
                             socket.end();
                             break;
                         }
+
+                        // join while countdown/playing: GAME_STARTED, close.
+                        if (gameState.phase !== 'lobby') {
+                            sendMsg(socket, { type: 'error', reason: 'GAME_STARTED' });
+                            socket.end();
+                            break;
+                        }
+
                         if (gameState.isFull()) {
                             sendMsg(socket, { type: 'error', reason: 'LOBBY_FULL' });
                             socket.end();
                             break;
                         }
-                        if (!msg.name || typeof msg.name !== 'string' || msg.name.trim().length === 0 || msg.name.length > 20) {
+
+                        const trimmedName = typeof msg.name === 'string' ? msg.name.trim() : '';
+                        const nameIsValid =
+                            trimmedName.length >= 1 &&
+                            trimmedName.length <= NAME_MAX_LENGTH &&
+                            !CONTROL_CHARS_RE.test(trimmedName);
+
+                        if (!nameIsValid) {
                             sendMsg(socket, { type: 'error', reason: 'NAME_INVALID' });
                             break;
                         }
 
                         playerId = crypto.randomUUID();
                         sockets.set(playerId, socket);
-                        gameState.addPlayer(playerId, msg.name.trim());
 
+                        // welcome is sent to THIS client first; addPlayer()
+                        // (below) triggers the 'lobby' broadcast, which must
+                        // arrive after welcome for the newly joined client
+                        // (section 2.3.2, "cuándo se envía lobby").
                         sendMsg(socket, {
                             type: 'welcome',
                             player_id: playerId,
@@ -86,6 +107,8 @@ export function createGameServer(gameState) {
                                 tick_rate: gameState.TICK_RATE
                             }
                         });
+
+                        gameState.addPlayer(playerId, trimmedName);
                         break;
                     }
 
@@ -98,9 +121,15 @@ export function createGameServer(gameState) {
                             sendMsg(socket, { type: 'error', reason: 'INVALID_PHASE' });
                             break;
                         }
-                        if (msg.dir && typeof msg.dir.x === 'number' && typeof msg.dir.y === 'number' &&
-                            msg.dir.x >= -1 && msg.dir.x <= 1 && msg.dir.y >= -1 && msg.dir.y <= 1) {
-                            gameState.setPlayerInput(playerId, msg.dir.x, msg.dir.y);
+
+                        const dir = msg.dir;
+                        const validDir =
+                            dir &&
+                            Number.isInteger(dir.x) && dir.x >= -1 && dir.x <= 1 &&
+                            Number.isInteger(dir.y) && dir.y >= -1 && dir.y <= 1;
+
+                        if (validDir) {
+                            gameState.setPlayerInput(playerId, dir.x, dir.y);
                         } else {
                             sendMsg(socket, { type: 'error', reason: 'INVALID_FIELD' });
                         }
@@ -116,7 +145,9 @@ export function createGameServer(gameState) {
                             sendMsg(socket, { type: 'error', reason: 'INVALID_PHASE' });
                             break;
                         }
-                        gameState.handleInteract(playerId);
+                        // Deferred: resolved after movement/victory for this
+                        // tick, in the order messages arrived (section 4.1/5.3).
+                        gameState.queueInteract(playerId);
                         break;
                     }
 

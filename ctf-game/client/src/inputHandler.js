@@ -1,52 +1,35 @@
 export class InputHandler {
-    constructor(onInteract) {
-        // Callback executed when the interact key is pressed
-        this.onInteract = onInteract;
-
+    constructor(onInteract = () => {}) {
         this.keys = {
             w: false,
             a: false,
             s: false,
             d: false
         };
+        this.onInteract = onInteract;
 
         window.addEventListener('keydown', (e) => this.handleKey(e, true));
         window.addEventListener('keyup', (e) => this.handleKey(e, false));
     }
 
     handleKey(e, isDown) {
-        // Press E to interact (grab/steal the flag)
-        if ( isDown &&(e.key.toLowerCase() === 'e' || e.code === 'Space') ) {
-            this.onInteract?.();
-            return;
-        }
-
-
-        // Keep the existing movement mapping
         switch (e.key.toLowerCase()) {
-            case 's':
-            case 'arrowdown':
-                this.keys.w = isDown;
-                break;
-
-            case 'a':
-            case 'arrowleft':
-                this.keys.a = isDown;
-                break;
-
-            case 'w':
-            case 'arrowup':
-                this.keys.s = isDown;
-                break;
-
-            case 'd':
-            case 'arrowright':
-                this.keys.d = isDown;
+            case 'w': case 'arrowup': this.keys.w = isDown; e.preventDefault(); break;
+            case 'a': case 'arrowleft': this.keys.a = isDown; e.preventDefault(); break;
+            case 's': case 'arrowdown': this.keys.s = isDown; e.preventDefault(); break;
+            case 'd': case 'arrowright': this.keys.d = isDown; e.preventDefault(); break;
+            case 'e': case ' ':
+                e.preventDefault();
+                if (isDown) this.onInteract();
                 break;
         }
     }
 
-    // Returns the normalized direction vector required by the protocol
+    // Returns the raw direction intent as required by the protocol: each
+    // axis is strictly -1, 0, or 1 (section 2.3.2 / 6.3). Diagonal
+    // normalization is the SERVER's job (section 4.1) — sending pre-divided
+    // fractional values like 0.707 would violate the "estrictamente enteros"
+    // rule and get rejected with INVALID_FIELD.
     getDirection() {
         let dx = 0;
         let dy = 0;
@@ -55,13 +38,6 @@ export class InputHandler {
         if (this.keys.s) dy += 1; // Y increases downward
         if (this.keys.a) dx -= 1;
         if (this.keys.d) dx += 1;
-
-        // Prevent diagonal speed boosting via normalization
-        const mag = Math.sqrt(dx * dx + dy * dy);
-        if (mag > 0) {
-            dx /= mag;
-            dy /= mag;
-        }
 
         return { x: dx, y: dy };
     }

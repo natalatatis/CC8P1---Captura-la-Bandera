@@ -15,9 +15,10 @@ const manualConnectBtn = document.getElementById('manualConnectBtn');
 const menuStatusEl = document.getElementById('menuStatus');
 const countdownEl = document.getElementById('countdownOverlay');
 const gameOverEl = document.getElementById('gameOverOverlay');
-const lobbyInfoEl = document.getElementById('lobbyInfo');
 const grabPromptEl = document.getElementById('grabPrompt');
 const carryingBannerEl = document.getElementById('carryingBanner');
+const squadRosterEl = document.getElementById('squadRoster');
+const squadCountEl = document.getElementById('squadCount');
 
 // ---- Game state ----
 let sceneManager = null;
@@ -28,6 +29,7 @@ const players = new Map(); // player_id -> Player instance
 const playerNames = new Map(); // player_id -> name (from 'lobby' broadcasts)
 let lastSentDir = { x: 0, y: 0 };
 let phase = 'lobby';
+let hasEnteredGame = false; // true once the 3D scene has been created (after 'start')
 
 function setStatus(text) {
     menuStatusEl.textContent = text;
@@ -89,8 +91,9 @@ net.on('error', (msg) => {
 net.on('welcome', (msg) => {
     myPlayerId = msg.player_id;
     config = msg.config;
-    setStatus(`¡Bienvenido! Esperando en el lobby...`);
-    startScene();
+    setStatus('¡Bienvenido! Esperando a que se complete el escuadrón...');
+    // Stay on the menu — the server only moves to 'countdown'/'start' once
+    // min_players (2) have joined (or, later, once the host starts it).
 });
 
 net.on('lobby', (msg) => {
@@ -99,22 +102,66 @@ net.on('lobby', (msg) => {
         players.get(p.id)?.setName(p.name); // refresh nametag if already spawned
     }
 
-    if (!hudEl.classList.contains('hidden')) {
-        lobbyInfoEl.classList.remove('hidden');
-        lobbyInfoEl.textContent = `Lobby: ${msg.players.length} jugador(es) esperando`;
+    renderSquadRoster(msg.players);
+
+    if (hasEnteredGame) {
+        // The server sent 'lobby' after we'd already started playing — that
+        // only happens when a countdown was aborted (someone left, dropping
+        // below min_players) or the round just ended and the 5s post-game
+        // pause finished. Either way, return to the menu without reconnecting.
+        returnToLobbyScreen();
     }
 });
 
+function renderSquadRoster(rosterPlayers) {
+    squadCountEl.textContent = String(rosterPlayers.length);
+    squadRosterEl.innerHTML = '';
+
+    for (const p of rosterPlayers) {
+        const li = document.createElement('li');
+        if (p.id === myPlayerId) li.classList.add('is-me');
+
+        const avatar = document.createElement('span');
+        avatar.className = 'avatar';
+        avatar.textContent = (p.name || '?').slice(0, 2).toUpperCase();
+
+        const label = document.createElement('span');
+        label.textContent = p.id === myPlayerId ? `${p.name} (tú)` : p.name;
+
+        li.appendChild(avatar);
+        li.appendChild(label);
+        squadRosterEl.appendChild(li);
+    }
+}
+
+function returnToLobbyScreen() {
+    hasEnteredGame = false;
+    phase = 'lobby';
+
+    gameOverEl.classList.add('hidden');
+    countdownEl.classList.add('hidden');
+    grabPromptEl.classList.add('hidden');
+    carryingBannerEl.classList.add('hidden');
+    hudEl.classList.add('hidden');
+    menuEl.classList.remove('hidden');
+    setStatus('De vuelta en la sala de espera.');
+
+    for (const player of players.values()) sceneManager?.removePlayer(player);
+    players.clear();
+}
+
+const menuCountdownEl = document.getElementById('menuCountdown');
+
 net.on('countdown', (msg) => {
     phase = 'countdown';
-    lobbyInfoEl.classList.add('hidden');
-    countdownEl.classList.remove('hidden');
-    countdownEl.textContent = msg.seconds > 0 ? String(msg.seconds) : '¡Ya!';
+    menuCountdownEl.classList.remove('hidden');
+    menuCountdownEl.textContent = `La partida comienza en ${msg.seconds}...`;
 });
 
 net.on('start', () => {
     phase = 'playing';
-    countdownEl.classList.add('hidden');
+    menuCountdownEl.classList.add('hidden');
+    startScene();
 });
 
 net.on('state', (msg) => {
@@ -154,15 +201,21 @@ net.on('game_over', (msg) => {
 
 // ---- Scene / render setup, created once we've joined ----
 function startScene() {
+    hasEnteredGame = true;
     document.activeElement?.blur();
     menuEl.classList.add('hidden');
     hudEl.classList.remove('hidden');
 
-    sceneManager = new SceneManager();
-    inputHandler = new InputHandler(() => net.interact());
-
-    animate();
-    startInputLoop();
+    // Rounds now repeat without reconnecting (server auto-returns to lobby
+    // after game_over), so only build the scene/input/loops once and reuse
+    // them — otherwise we'd stack a second WebGL canvas and a second set of
+    // keyboard listeners on every subsequent round.
+    if (!sceneManager) {
+        sceneManager = new SceneManager();
+        inputHandler = new InputHandler(() => net.interact());
+        animate();
+        startInputLoop();
+    }
 }
 
 function syncPlayers(serverPlayers) {
