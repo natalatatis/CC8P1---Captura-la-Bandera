@@ -21,12 +21,26 @@
                 <p class="subtitle">Elige un servidor en tu red o conéctate manualmente para unirte a la partida.</p>
             </header>
 
-            <section class="block">
+            <section class="block role-select">
+                <span class="block-label">¿Qué vas a hacer en esta máquina?</span>
+                <div class="role-options">
+                    <button id="roleClientBtn" class="role-option is-active" type="button">
+                        <span class="role-title">🎮 Jugar</span>
+                        <span class="role-desc">Conéctate a un servidor y controla a tu personaje</span>
+                    </button>
+                    <button id="roleHostBtn" class="role-option" type="button">
+                        <span class="role-title">🖥️ Ser anfitrión</span>
+                        <span class="role-desc">Corres el servidor aquí y solo observas la partida</span>
+                    </button>
+                </div>
+            </section>
+
+            <section id="nameSection" class="block">
                 <label class="field-label" for="playerName">Tu nombre</label>
                 <input id="playerName" class="field-input" type="text" maxlength="20" placeholder="¿Cómo te llamas?" autocomplete="off" />
             </section>
 
-            <section class="block">
+            <section id="discoverySection" class="block">
                 <div class="block-heading">
                     <span class="block-label">Servidores en tu red</span>
                     <span id="scanIndicator" class="scan-indicator">
@@ -48,6 +62,16 @@
 
                 <p id="menuStatus" class="status-line"></p>
             </section>
+
+            <section id="hostSection" class="block hidden">
+                <p class="panel-hint">
+                    Vas a observar la partida de <strong>tu propio servidor</strong> (localhost). Recuerda tenerlo
+                    corriendo con <code>npm run server</code>. No vas a poder moverte ni tomar la bandera — solo ver.
+                </p>
+                <button id="hostConnectBtn" class="btn btn-primary">Ver mi partida</button>
+                <p id="hostStatus" class="status-line"></p>
+            </section>
+
 
             <section class="block">
                 <div class="block-heading">

@@ -30,6 +30,7 @@ export function createGameServer(gameState) {
     const server = net.createServer((socket) => {
         const parser = new MessageParser();
         let playerId = null;
+        let isSpectator = false;
 
         socket.on('data', (chunk) => {
             // 2.1 / 6.2: any message over message_max_size (64 KB, including
@@ -64,17 +65,30 @@ export function createGameServer(gameState) {
                             break;
                         }
 
-                        // join while countdown/playing: GAME_STARTED, close.
-                        if (gameState.phase !== 'lobby') {
-                            sendMsg(socket, { type: 'error', reason: 'GAME_STARTED' });
-                            socket.end();
-                            break;
-                        }
+                        // Project-specific extension, not part of the class
+                        // protocol: "spectator" is an unknown field to any
+                        // other team's server, which must ignore it
+                        // silently (section 2.2) — so this never breaks
+                        // interop. A spectator only ever watches: it never
+                        // occupies a player slot, never counts toward
+                        // min/max players, and can join at any phase
+                        // (lobby, countdown, mid-match, whenever the host
+                        // opens their own viewer).
+                        const wantsSpectator = msg.spectator === true;
 
-                        if (gameState.isFull()) {
-                            sendMsg(socket, { type: 'error', reason: 'LOBBY_FULL' });
-                            socket.end();
-                            break;
+                        if (!wantsSpectator) {
+                            // join while countdown/playing: GAME_STARTED, close.
+                            if (gameState.phase !== 'lobby') {
+                                sendMsg(socket, { type: 'error', reason: 'GAME_STARTED' });
+                                socket.end();
+                                break;
+                            }
+
+                            if (gameState.isFull()) {
+                                sendMsg(socket, { type: 'error', reason: 'LOBBY_FULL' });
+                                socket.end();
+                                break;
+                            }
                         }
 
                         const trimmedName = typeof msg.name === 'string' ? msg.name.trim() : '';
@@ -89,6 +103,7 @@ export function createGameServer(gameState) {
                         }
 
                         playerId = crypto.randomUUID();
+                        isSpectator = wantsSpectator;
                         sockets.set(playerId, socket);
 
                         // welcome is sent to THIS client first; addPlayer()
@@ -108,13 +123,19 @@ export function createGameServer(gameState) {
                             }
                         });
 
-                        gameState.addPlayer(playerId, trimmedName);
+                        if (!isSpectator) {
+                            gameState.addPlayer(playerId, trimmedName);
+                        }
                         break;
                     }
 
                     case 'input': {
                         if (!playerId) {
                             sendMsg(socket, { type: 'error', reason: 'NOT_JOINED' });
+                            break;
+                        }
+                        if (isSpectator) {
+                            sendMsg(socket, { type: 'error', reason: 'INVALID_PHASE' });
                             break;
                         }
                         if (gameState.phase !== 'playing') {
@@ -141,6 +162,10 @@ export function createGameServer(gameState) {
                             sendMsg(socket, { type: 'error', reason: 'NOT_JOINED' });
                             break;
                         }
+                        if (isSpectator) {
+                            sendMsg(socket, { type: 'error', reason: 'INVALID_PHASE' });
+                            break;
+                        }
                         if (gameState.phase !== 'playing') {
                             sendMsg(socket, { type: 'error', reason: 'INVALID_PHASE' });
                             break;
@@ -161,7 +186,7 @@ export function createGameServer(gameState) {
         socket.on('close', () => {
             if (playerId) {
                 sockets.delete(playerId);
-                gameState.removePlayer(playerId);
+                if (!isSpectator) gameState.removePlayer(playerId);
             }
         });
 

@@ -19,12 +19,20 @@ const grabPromptEl = document.getElementById('grabPrompt');
 const carryingBannerEl = document.getElementById('carryingBanner');
 const squadRosterEl = document.getElementById('squadRoster');
 const squadCountEl = document.getElementById('squadCount');
+const roleClientBtn = document.getElementById('roleClientBtn');
+const roleHostBtn = document.getElementById('roleHostBtn');
+const nameSectionEl = document.getElementById('nameSection');
+const discoverySectionEl = document.getElementById('discoverySection');
+const hostSectionEl = document.getElementById('hostSection');
+const hostConnectBtn = document.getElementById('hostConnectBtn');
+const hostStatusEl = document.getElementById('hostStatus');
 
 // ---- Game state ----
 let sceneManager = null;
 let inputHandler = null;
 let myPlayerId = null;
 let config = null;
+let isSpectator = false; // true when this client is the host/observer (section: only clients can play)
 const players = new Map(); // player_id -> Player instance
 const playerNames = new Map(); // player_id -> name (from 'lobby' broadcasts)
 let lastSentDir = { x: 0, y: 0 };
@@ -34,6 +42,26 @@ let hasEnteredGame = false; // true once the 3D scene has been created (after 's
 function setStatus(text) {
     menuStatusEl.textContent = text;
 }
+
+// ---- Role selection: host/spectator (runs the server, only watches) vs
+// player (connects to a server and actually plays). This is a
+// project-specific requirement, not part of the class-wide wire protocol —
+// see Network.js/gameSocket.js for how "spectator" is implemented safely.
+roleClientBtn.addEventListener('click', () => setRole('client'));
+roleHostBtn.addEventListener('click', () => setRole('host'));
+
+function setRole(newRole) {
+    isSpectator = newRole === 'host';
+    roleClientBtn.classList.toggle('is-active', newRole === 'client');
+    roleHostBtn.classList.toggle('is-active', newRole === 'host');
+    discoverySectionEl.classList.toggle('hidden', newRole === 'host');
+    hostSectionEl.classList.toggle('hidden', newRole === 'client');
+}
+
+hostConnectBtn.addEventListener('click', () => {
+    hostStatusEl.textContent = 'Conectando a tu servidor local...';
+    net.connectTo('127.0.0.1', 8889); // the default TCP port from server/index.js
+});
 
 // ---- Bridge connection (local only, see Network.js / bridge.js) ----
 const net = new NetworkClient('ws://localhost:8890');
@@ -74,24 +102,35 @@ function attemptConnect(ip, tcp_port) {
 }
 
 net.on('bridge_connected', () => {
-    const name = nameInput.value.trim() || `Jugador_${Math.floor(Math.random() * 1000)}`;
-    setStatus('Conectado. Uniéndose a la partida...');
-    net.join(name);
+    const defaultName = isSpectator ? 'Anfitrión' : `Jugador_${Math.floor(Math.random() * 1000)}`;
+    const name = nameInput.value.trim() || defaultName;
+    const statusText = isSpectator ? 'Conectado. Entrando como espectador...' : 'Conectado. Uniéndose a la partida...';
+    setStatus(statusText);
+    hostStatusEl.textContent = statusText;
+    net.join(name, isSpectator);
 });
 
 net.on('bridge_disconnected', () => {
-    setStatus('El servidor cerró la conexión.');
+    const text = 'El servidor cerró la conexión.';
+    setStatus(text);
+    hostStatusEl.textContent = text;
 });
 
 net.on('error', (msg) => {
-    setStatus(`Error: ${msg.reason || msg.detail || 'desconocido'}`);
+    const text = `Error: ${msg.reason || msg.detail || 'desconocido'}`;
+    setStatus(text);
+    hostStatusEl.textContent = text;
 });
 
 // ---- Protocol messages from the real game server (relayed by the bridge) ----
 net.on('welcome', (msg) => {
     myPlayerId = msg.player_id;
     config = msg.config;
-    setStatus('¡Bienvenido! Esperando a que se complete el escuadrón...');
+    const text = isSpectator
+        ? 'Conectado como espectador. Esperando a que empiece la partida...'
+        : '¡Bienvenido! Esperando a que se complete el escuadrón...';
+    setStatus(text);
+    hostStatusEl.textContent = text;
     // Stay on the menu — the server only moves to 'countdown'/'start' once
     // min_players (2) have joined (or, later, once the host starts it).
 });
@@ -212,9 +251,11 @@ function startScene() {
     // keyboard listeners on every subsequent round.
     if (!sceneManager) {
         sceneManager = new SceneManager();
-        inputHandler = new InputHandler(() => net.interact());
+        if (!isSpectator) {
+            inputHandler = new InputHandler(() => net.interact());
+            startInputLoop();
+        }
         animate();
-        startInputLoop();
     }
 }
 

@@ -50,8 +50,11 @@ export class NetworkClient {
         this._send({ type: 'connect', ip, tcp_port });
     }
 
-    join(name) {
-        this._send({ type: 'join', v: 1, name });
+    // spectator is a project-specific extension (not part of the class
+    // protocol) — see gameSocket.js. Any other team's server will just
+    // ignore this unknown field per section 2.2, so it's always safe to send.
+    join(name, spectator = false) {
+        this._send({ type: 'join', v: 1, name, spectator });
     }
 
     input(x, y) {

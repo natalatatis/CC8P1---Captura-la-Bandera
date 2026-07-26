@@ -2,7 +2,7 @@
 // ---------------------
 // The class protocol requires plain TCP sockets and plain UDP
 // sockets for the actual match traffic, with no external connection library
-// (no `ws`) — that rule is about wire-compatibility between the projects.
+// (no `ws`) — that rule is about wire-compatibility between the 16 projects.
 //
 // The problem: a browser tab can NEVER open a raw TCP or UDP socket. That is
 // not a library limitation, it's a browser sandboxing rule with no
@@ -30,14 +30,15 @@ const BRIDGE_PORT = 8890;       // local only, browser <-> bridge
 const DISCOVERY_PORT = 8888;    // fixed by protocol 1.2
 const LIMITED_BROADCAST = '255.255.255.255';
 
-// Section 1.3: many routers don't forward 255.255.255.255, so the spec
-// requires also sending to the subnet-directed broadcast (e.g.
-// 192.168.1.255) computed from each local interface's own IP + netmask.
+const VIRTUAL_IFACE_RE = /virtualbox|vmware|hyper-v|vethernet|docker|wsl|loopback|tailscale|zerotier|utun|tun\d|tap\d/i;
+
 function getSubnetBroadcastAddresses() {
     const addresses = [];
     const interfaces = os.networkInterfaces();
 
-    for (const entries of Object.values(interfaces)) {
+    for (const [ifaceName, entries] of Object.entries(interfaces)) {
+        if (VIRTUAL_IFACE_RE.test(ifaceName)) continue;
+
         for (const entry of entries || []) {
             if (entry.family !== 'IPv4' || entry.internal) continue;
 
