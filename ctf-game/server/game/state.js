@@ -158,6 +158,7 @@ export class GameState extends EventEmitter {
             this.phase = 'countdown';
             this.countdown = this.COUNTDOWN_SECONDS;
             this._lastAnnouncedSecond = null;
+            console.log(`[GAME] Countdown started with ${this.players.size} players.`);
         }
     }
 
