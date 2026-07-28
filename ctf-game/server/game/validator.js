@@ -7,7 +7,7 @@ export const TICK_RATE = 20;
 
 // Server-side constants (not sent in welcome.config).
 export const COUNTDOWN_SECONDS = 5;
-export const MIN_PLAYERS = 2;           // minimum to trigger/keep the countdown
+export const MIN_PLAYERS = 1;           // minimum to trigger/keep the countdown
 export const POST_GAME_SECONDS = 5;     // pause after game_over before back to lobby
 export const CIRCLE_CENTER = 500;       // = MAP_SIZE / 2
 export const SPAWN_RADIUS_MIN = 350;

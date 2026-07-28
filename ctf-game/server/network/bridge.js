@@ -25,26 +25,35 @@ import net from 'node:net';
 import dgram from 'node:dgram';
 import os from 'node:os';
 import { MessageParser } from '../../protocol/parser.js';
+import { MESSAGE_MAX_SIZE } from '../game/validator.js';
 
 const BRIDGE_PORT = 8890;       // local only, browser <-> bridge
 const DISCOVERY_PORT = 8888;    // fixed by protocol 1.2
 const LIMITED_BROADCAST = '255.255.255.255';
+const MANUAL_DISCOVER_TIMEOUT_MS = 3000;
 
-const VIRTUAL_IFACE_RE = /virtualbox|vmware|hyper-v|vethernet|docker|wsl|loopback|tailscale|zerotier|utun|tun\d|tap\d/i;
+const VIRTUAL_IFACE_RE = /virtualbox|vmware|hyper-v|vethernet|docker|wsl|loopback|tailscale|utun|tun\d|tap\d/i;
 
 function getSubnetBroadcastAddresses() {
     const addresses = [];
     const interfaces = os.networkInterfaces();
 
     for (const [ifaceName, entries] of Object.entries(interfaces)) {
+        console.log(ifaceName);   // <-- add this
+
         if (VIRTUAL_IFACE_RE.test(ifaceName)) continue;
 
         for (const entry of entries || []) {
             if (entry.family !== 'IPv4' || entry.internal) continue;
 
+            console.log(`  ${entry.address} / ${entry.netmask}`);
+
             const ipParts = entry.address.split('.').map(Number);
             const maskParts = entry.netmask.split('.').map(Number);
-            const broadcastParts = ipParts.map((octet, i) => (octet | (~maskParts[i] & 0xff)) & 0xff);
+            const broadcastParts = ipParts.map((octet, i) =>
+                (octet | (~maskParts[i] & 0xff)) & 0xff
+            );
+
             addresses.push(broadcastParts.join('.'));
         }
     }
@@ -80,8 +89,33 @@ wss.on('connection', (ws) => {
             return;
         }
 
+        // Manual fallback (spec 1.3, "vía Manual"): when broadcast doesn't
+        // reach the other machine (blocked/isolated router, e.g. many
+        // mobile hotspots isolate connected clients from each other), the
+        // person only needs to know the server's IP. We send the same
+        // `discover` message by UDP unicast straight to IP:8888 instead of
+        // broadcasting it, and wait for that one server's `server_info`
+        // reply to learn its TCP port dynamically — no need to know or
+        // type the port by hand.
+        if (msg.type === 'discover_manual') {
+            discoverManual(msg.ip);
+            return;
+        }
+
         if (msg.type === 'connect') {
             connectToServer(msg.ip, msg.tcp_port);
+            return;
+        }
+
+        // Explicit disconnect requested by the client (e.g. after a round
+        // ends and the person returns to the connection screen): tear down
+        // the TCP session to the real game server without closing the
+        // browser<->bridge WebSocket. The server sees a normal TCP close
+        // (section 5.2) and removes the player; no protocol message is
+        // needed for this. The person must choose/press a server again to
+        // start a new session.
+        if (msg.type === 'disconnect') {
+            if (tcpSocket) tcpSocket.destroy();
             return;
         }
 
@@ -102,7 +136,7 @@ wss.on('connection', (ws) => {
             try {
                 const data = JSON.parse(m.toString('utf8'));
                 if (data.type === 'server_info' && data.v === 1) {
-                    const key = `${rinfo.address}:${data.tcp_port}`;
+                    const key = `${data.name}:${data.tcp_port}:${data.state}`;
                     foundServers.set(key, {
                         name: data.name,
                         ip: rinfo.address,
@@ -138,7 +172,7 @@ wss.on('connection', (ws) => {
     function connectToServer(ip, tcpPort) {
         if (tcpSocket) tcpSocket.destroy();
 
-        parser = new MessageParser();
+        parser = new MessageParser(MESSAGE_MAX_SIZE);
         tcpSocket = new net.Socket();
 
         tcpSocket.connect(tcpPort, ip, () => {
@@ -147,11 +181,64 @@ wss.on('connection', (ws) => {
 
         tcpSocket.on('data', (chunk) => {
             const messages = parser.feed(chunk);
-            for (const m of messages) send(m);
+            for (const m of messages) {
+                send(m.__fatal ? { type: 'error', reason: m.reason } : m);
+                if (m.__fatal) { tcpSocket.destroy(); return; }
+            }
         });
 
         tcpSocket.on('close', () => send({ type: 'bridge_disconnected' }));
         tcpSocket.on('error', (err) => send({ type: 'error', reason: 'TCP_ERROR', detail: err.message }));
+    }
+
+    // Manual unicast discovery (spec 1.3): same `discover` message as the
+    // broadcast path, but sent straight to one IP:8888. We don't know this
+    // server's TCP port in advance either — that's exactly what its
+    // `server_info` reply tells us, the same as with broadcast discovery.
+    function discoverManual(ip) {
+        if (!ip) {
+            send({ type: 'error', reason: 'INVALID_FIELD', detail: 'ip requerida' });
+            return;
+        }
+
+        const sock = dgram.createSocket('udp4');
+        const discoverMsg = Buffer.from(JSON.stringify({ type: 'discover', v: 1 }));
+        let done = false;
+
+        const finish = () => {
+            if (done) return;
+            done = true;
+            clearTimeout(timer);
+            sock.close();
+        };
+
+        sock.on('message', (m) => {
+            try {
+                const data = JSON.parse(m.toString('utf8'));
+                if (data.type === 'server_info' && data.v === 1) {
+                    send({
+                        type: 'server_list',
+                        servers: [{ name: data.name, ip, tcp_port: data.tcp_port, state: data.state, players: data.players }]
+                    });
+                }
+            } catch {
+                // ignore malformed reply
+            } finally {
+                finish();
+            }
+        });
+
+        sock.on('error', (err) => {
+            send({ type: 'error', reason: 'DISCOVERY_ERROR', detail: err.message });
+            finish();
+        });
+
+        const timer = setTimeout(() => {
+            send({ type: 'error', reason: 'DISCOVERY_ERROR', detail: `Sin respuesta de ${ip}:8888` });
+            finish();
+        }, MANUAL_DISCOVER_TIMEOUT_MS);
+
+        sock.send(discoverMsg, 0, discoverMsg.length, DISCOVERY_PORT, ip);
     }
 
     ws.on('close', () => {

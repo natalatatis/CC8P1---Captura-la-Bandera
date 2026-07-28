@@ -28,22 +28,25 @@ export function createGameServer(gameState) {
     gameState.on('game_over', broadcast);
 
     const server = net.createServer((socket) => {
-        const parser = new MessageParser();
+        // 2.1 / 6.2: any single message over message_max_size (64 KB,
+        // including the trailing \n) is rejected and the TCP connection is
+        // closed. The limit is enforced per message inside the parser, not
+        // per chunk, so it can't be tripped by several small legitimate
+        // messages simply arriving in the same TCP read.
+        const parser = new MessageParser(MESSAGE_MAX_SIZE);
         let playerId = null;
         let isSpectator = false;
 
         socket.on('data', (chunk) => {
-            // 2.1 / 6.2: any message over message_max_size (64 KB, including
-            // the trailing \n) is rejected and the TCP connection is closed.
-            if (parser.buffer.length + chunk.length > MESSAGE_MAX_SIZE) {
-                sendMsg(socket, { type: 'error', reason: 'MESSAGE_TOO_LARGE' });
-                socket.end();
-                return;
-            }
-
             const messages = parser.feed(chunk);
 
             for (const msg of messages) {
+                if (msg.__fatal) {
+                    sendMsg(socket, { type: 'error', reason: msg.reason });
+                    socket.end();
+                    return;
+                }
+
                 if (!msg || typeof msg.type !== 'string') {
                     sendMsg(socket, { type: 'error', reason: 'MISSING_FIELD' });
                     continue;

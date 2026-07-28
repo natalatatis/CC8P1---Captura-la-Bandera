@@ -32,7 +32,7 @@ udpServer.on('message', (msg, rinfo) => {
             const response = JSON.stringify({
                 type: 'server_info',
                 v: 1,
-                name: 'Mi Servidor CTF',
+                name: 'AASERVIDOR',
                 tcp_port: TCP_PORT,
                 // Only "lobby" (accepting new players right now) or
                 // "playing" (anything else: countdown, in-progress, or the

@@ -14,9 +14,9 @@ export class InputHandler {
 
     handleKey(e, isDown) {
         switch (e.key.toLowerCase()) {
-            case 'w': case 'arrowup': this.keys.w = isDown; e.preventDefault(); break;
+            case 'w': case 'arrowup': this.keys.s = isDown; e.preventDefault(); break;
             case 'a': case 'arrowleft': this.keys.a = isDown; e.preventDefault(); break;
-            case 's': case 'arrowdown': this.keys.s = isDown; e.preventDefault(); break;
+            case 's': case 'arrowdown': this.keys.w = isDown; e.preventDefault(); break;
             case 'd': case 'arrowright': this.keys.d = isDown; e.preventDefault(); break;
             case 'e': case ' ':
                 e.preventDefault();
