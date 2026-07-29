@@ -2,9 +2,9 @@
 // ---------------------
 // The class protocol requires plain TCP sockets and plain UDP
 // sockets for the actual match traffic, with no external connection library
-// (no `ws`) — that rule is about wire-compatibility between the projects.
+// (no `ws`) — that rule is about wire-compatibility between the 16 projects.
 //
-// The problem: a browser tab cannot open a raw TCP or UDP socket. That is
+// The problem: a browser tab can NEVER open a raw TCP or UDP socket. That is
 // not a library limitation, it's a browser sandboxing rule with no
 // workaround — `net.Socket`/`dgram` simply don't exist in browser JS, and no
 // npm package changes that.
@@ -88,6 +88,15 @@ wss.on('connection', (ws) => {
             startLocalDiscovery();
             return;
         }
+
+        // Manual fallback (spec 1.3, "vía Manual"): when broadcast doesn't
+        // reach the other machine (blocked/isolated router, e.g. many
+        // mobile hotspots isolate connected clients from each other), the
+        // person only needs to know the server's IP. We send the same
+        // `discover` message by UDP unicast straight to IP:8888 instead of
+        // broadcasting it, and wait for that one server's `server_info`
+        // reply to learn its TCP port dynamically — no need to know or
+        // type the port by hand.
         if (msg.type === 'discover_manual') {
             discoverManual(msg.ip);
             return;
@@ -98,7 +107,13 @@ wss.on('connection', (ws) => {
             return;
         }
 
-        // Explicit disconnect requested by the client 
+        // Explicit disconnect requested by the client (e.g. after a round
+        // ends and the person returns to the connection screen): tear down
+        // the TCP session to the real game server without closing the
+        // browser<->bridge WebSocket. The server sees a normal TCP close
+        // (section 5.2) and removes the player; no protocol message is
+        // needed for this. The person must choose/press a server again to
+        // start a new session.
         if (msg.type === 'disconnect') {
             if (tcpSocket) tcpSocket.destroy();
             return;
@@ -176,7 +191,10 @@ wss.on('connection', (ws) => {
         tcpSocket.on('error', (err) => send({ type: 'error', reason: 'TCP_ERROR', detail: err.message }));
     }
 
-    // Manual unicast discovery 
+    // Manual unicast discovery (spec 1.3): same `discover` message as the
+    // broadcast path, but sent straight to one IP:8888. We don't know this
+    // server's TCP port in advance either — that's exactly what its
+    // `server_info` reply tells us, the same as with broadcast discovery.
     function discoverManual(ip) {
         if (!ip) {
             send({ type: 'error', reason: 'INVALID_FIELD', detail: 'ip requerida' });

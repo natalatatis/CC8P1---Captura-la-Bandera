@@ -37,7 +37,8 @@ export class GameState extends EventEmitter {
         // insideCircle tracks whether the *current carrier* was at distance
         // <= VICTORY_RADIUS the last time we checked (at capture/steal time,
         // and every tick afterwards). Victory only fires on the transition
-        // true -> false 
+        // true -> false (section 3.3 / 5.3: a thief who grabs the flag while
+        // already outside does NOT win instantly).
         this.flag = {
             x: this.CENTRAL_COORD,
             y: this.CENTRAL_COORD,
@@ -51,9 +52,14 @@ export class GameState extends EventEmitter {
         this._lastAnnouncedSecond = null;
         this.postGameTimer = 0;
 
+        // The lobby no longer starts automatically. The host must
+        // explicitly request the start after all players have joined.
+
         // Interact requests are queued and only resolved after movement +
-        // victory are evaluated for the tick. This also makes
-        // TCP arrival order the one and only tie-break rule 
+        // victory are evaluated for the tick (section 4.1: "el servidor
+        // aplica primero el movimiento y la condición de victoria, y
+        // después procesa las interacciones pendientes"). This also makes
+        // TCP arrival order the one and only tie-break rule (section 5.3).
         this.pendingInteracts = [];
     }
 
@@ -69,7 +75,9 @@ export class GameState extends EventEmitter {
             y: this.CENTRAL_COORD,
             dir: { x: 0, y: 0 }
         });
-        if (this.phase === 'lobby') this.emitLobby();
+        if (this.phase === 'lobby') {
+            this.emitLobby();
+        }
     }
 
     removePlayer(id) {
@@ -97,7 +105,9 @@ export class GameState extends EventEmitter {
             return;
         }
 
-        if (this.phase === 'lobby') this.emitLobby();
+        if (this.phase === 'lobby') {
+            this.emitLobby();
+        }
     }
 
     setPlayerInput(id, dirX, dirY) {
@@ -135,7 +145,7 @@ export class GameState extends EventEmitter {
     update(deltaTime = 1 / this.TICK_RATE) {
         switch (this.phase) {
             case 'lobby':
-                this.updateLobby();
+                this.updateLobby(deltaTime);
                 break;
             case 'countdown':
                 this.updateCountdown(deltaTime);
@@ -150,13 +160,33 @@ export class GameState extends EventEmitter {
     }
 
     updateLobby() {
-        // Countdown starts once min_players (2) have joined.
-        if (this.players.size >= this.MIN_PLAYERS) {
-            this.phase = 'countdown';
-            this.countdown = this.COUNTDOWN_SECONDS;
-            this._lastAnnouncedSecond = null;
-            console.log(`[GAME] Countdown started with ${this.players.size} players.`);
+        // Intentionally empty. Players may continue joining while the server
+        // remains in the lobby. Only an explicit host request starts the
+        // countdown.
+    }
+
+    requestStart() {
+        if (this.phase !== 'lobby') {
+            return { ok: false, reason: 'INVALID_PHASE' };
         }
+
+        if (this.players.size < this.MIN_PLAYERS) {
+            return { ok: false, reason: 'NOT_ENOUGH_PLAYERS' };
+        }
+
+        // Send one final roster update before changing phase so every client
+        // sees the complete lobby selected by the host.
+        this.emitLobby();
+
+        this.phase = 'countdown';
+        this.countdown = this.COUNTDOWN_SECONDS;
+        this._lastAnnouncedSecond = null;
+
+        console.log(
+            `[GAME] Host started countdown with ${this.players.size} players.`
+        );
+
+        return { ok: true };
     }
 
     updateCountdown(deltaTime) {
@@ -171,6 +201,7 @@ export class GameState extends EventEmitter {
 
         if (this.countdown <= 0) {
             // Spawn is assigned here, at 'start' time, not at join time
+            // (section 3.3): uniform random point on the ring R∈[350,450].
             for (const player of this.players.values()) {
                 const spawn = randomSpawnPosition();
                 player.x = spawn.x;
@@ -196,7 +227,7 @@ export class GameState extends EventEmitter {
             }
         }
 
-        // 2) Victory condition, evaluated before interactions
+        // 2) Victory condition, evaluated before interactions (section 4.1).
         if (this.flag.owner) {
             const carrier = this.players.get(this.flag.owner);
 

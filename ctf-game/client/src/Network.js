@@ -1,64 +1,111 @@
-// This talks ONLY to our own local bridge (server/network/bridge.js) on
-// localhost, using the browser's built-in WebSocket — not the `ws` package,
-// and not the class protocol's transport. The real join/input/interact/
-// state/... messages that travel to the actual CTF server are carried
-// exactly as specified (TCP, JSON, '\n' framing) by the bridge, not by this
-// file.
 export class NetworkClient {
-    constructor(bridgeUrl = 'ws://localhost:8890') {
-        this.handlers = {};
-        this.socket = new WebSocket(bridgeUrl);
+    constructor(url) {
+        this.url = url;
+        this.handlers = new Map();
+        this.socket = new WebSocket(url);
 
-        this.socket.addEventListener('open', () => this._emit('open', {}));
-        this.socket.addEventListener('close', () => this._emit('close', {}));
-        this.socket.addEventListener('error', (e) => this._emit('socket_error', e));
+        this.socket.addEventListener('open', () => {
+            this.emit('open');
+        });
+
+        this.socket.addEventListener('close', () => {
+            this.emit('close');
+        });
+
+        this.socket.addEventListener('error', () => {
+            this.emit('error', {
+                type: 'error',
+                reason: 'BRIDGE_ERROR'
+            });
+        });
+
         this.socket.addEventListener('message', (event) => {
-            let msg;
+            let message;
+
             try {
-                msg = JSON.parse(event.data);
+                message = JSON.parse(event.data);
             } catch {
+                this.emit('error', {
+                    type: 'error',
+                    reason: 'INVALID_JSON'
+                });
                 return;
             }
-            if (msg && typeof msg.type === 'string') this._emit(msg.type, msg);
+
+            if (message && typeof message.type === 'string') {
+                this.emit(message.type, message);
+            }
         });
     }
 
-    on(type, callback) {
-        (this.handlers[type] ??= []).push(callback);
-        return this;
+    on(type, handler) {
+        if (!this.handlers.has(type)) {
+            this.handlers.set(type, []);
+        }
+
+        this.handlers.get(type).push(handler);
     }
 
-    _emit(type, payload) {
-        for (const cb of this.handlers[type] || []) cb(payload);
-    }
-
-    _send(obj) {
-        if (this.socket.readyState === WebSocket.OPEN) {
-            this.socket.send(JSON.stringify(obj));
+    emit(type, message) {
+        for (const handler of this.handlers.get(type) || []) {
+            handler(message);
         }
     }
 
-    // Ask the bridge to run UDP broadcast discovery (1.3) on our behalf.
+    send(message) {
+        if (this.socket.readyState !== WebSocket.OPEN) {
+            this.emit('error', {
+                type: 'error',
+                reason: 'BRIDGE_NOT_CONNECTED'
+            });
+            return false;
+        }
+
+        this.socket.send(JSON.stringify(message));
+        return true;
+    }
+
     discover() {
-        this._send({ type: 'discover_local' });
+        this.send({ type: 'discover_local' });
     }
 
-    // Ask the bridge to open the real TCP game connection to a chosen server.
-    connectTo(ip, tcp_port) {
-        this._send({ type: 'connect', ip, tcp_port });
+    discoverManual(ip) {
+        this.send({ type: 'discover_manual', ip });
     }
 
-    // spectator is a project-specific extension (not part of the class
-    // protocol) — see gameSocket.js. Any other team's server will just
+    connectTo(ip, tcpPort) {
+        this.send({
+            type: 'connect',
+            ip,
+            tcp_port: Number(tcpPort)
+        });
+    }
+
+    disconnect() {
+        this.send({ type: 'disconnect' });
+    }
+
     join(name, spectator = false) {
-        this._send({ type: 'join', v: 1, name, spectator });
+        this.send({
+            type: 'join',
+            v: 1,
+            name,
+            spectator
+        });
+    }
+
+    startGame() {
+        this.send({ type: 'start_game' });
     }
 
     input(x, y) {
-        this._send({ type: 'input', dir: { x, y } });
+        this.send({
+            type: 'input',
+            dir: { x, y }
+        });
     }
 
     interact() {
-        this._send({ type: 'interact' });
+        this.send({ type: 'interact' });
     }
 }

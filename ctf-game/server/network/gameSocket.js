@@ -10,8 +10,9 @@ const PROTOCOL_VERSION = 1;
 
 const CONTROL_CHARS_RE = /[\u0000-\u001F\u007F]/;
 
-// Safely sends one compact JSON message followed by exactly one newline.
- 
+/*
+ * Safely sends one compact JSON message followed by exactly one newline.
+ */
 function sendMsg(socket, message) {
     if (!socket || socket.destroyed || !socket.writable) {
         console.warn(
@@ -234,6 +235,10 @@ export function createGameServer(gameState) {
                     handleInteract();
                     break;
 
+                case 'start_game':
+                    handleStartGame();
+                    break;
+
                 default:
                     sendError('UNKNOWN_TYPE');
                     break;
@@ -399,6 +404,32 @@ export function createGameServer(gameState) {
             console.log(
                 `[INPUT] Player ${playerId}: ` +
                 `(${message.dir.x}, ${message.dir.y})`
+            );
+        }
+
+        function handleStartGame() {
+            if (!playerId) {
+                sendError('NOT_JOINED');
+                return;
+            }
+
+            // Only the local host/observer connection is allowed to start.
+            // Regular players cannot force the match to begin.
+            if (!isSpectator) {
+                sendError('HOST_ONLY');
+                return;
+            }
+
+            const result = gameState.requestStart();
+
+            if (!result.ok) {
+                sendError(result.reason);
+                return;
+            }
+
+            console.log(
+                `[HOST] Start accepted from ${playerId}; ` +
+                `${gameState.players.size} players in lobby.`
             );
         }
 

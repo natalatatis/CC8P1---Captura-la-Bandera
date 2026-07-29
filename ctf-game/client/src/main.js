@@ -3,8 +3,9 @@ import { Player } from './Player.js';
 import { InputHandler } from './inputHandler.js';
 import { NetworkClient } from './Network.js';
 
-
+// ============================================================
 // DOM references
+// ============================================================
 
 const menuEl = document.getElementById('menu');
 const hudEl = document.getElementById('hud');
@@ -37,14 +38,22 @@ const hostSectionEl = document.getElementById('hostSection');
 
 const hostConnectBtn = document.getElementById('hostConnectBtn');
 const hostStatusEl = document.getElementById('hostStatus');
+const hostControlsEl = document.getElementById('hostControls');
+const startGameBtn = document.getElementById('startGameBtn');
+const waitingForHostEl = document.getElementById('waitingForHost');
 
-
+// ============================================================
 // Constants
+// ============================================================
+
 const BRIDGE_URL = 'ws://localhost:8890';
 const DEFAULT_TCP_PORT = 8889;
 const DISCOVERY_INTERVAL_MS = 2000;
 
+// ============================================================
 // Game state
+// ============================================================
+
 let sceneManager = null;
 let inputHandler = null;
 
@@ -61,8 +70,12 @@ let phase = 'lobby';
 let hasEnteredGame = false;
 
 let discoveryIntervalId = null;
+let lobbyPlayerCount = 0;
 
+// ============================================================
 // Small helpers
+// ============================================================
+
 function setStatus(text) {
     menuStatusEl.textContent = text;
 }
@@ -101,7 +114,27 @@ function startDiscoveryLoop() {
     }, DISCOVERY_INTERVAL_MS);
 }
 
+function updateHostControls() {
+    const canStart =
+        isSpectator &&
+        phase === 'lobby' &&
+        lobbyPlayerCount >= 2;
+
+    hostControlsEl.classList.toggle('hidden', !isSpectator);
+    startGameBtn.disabled = !canStart;
+    startGameBtn.textContent = canStart
+        ? `Iniciar partida (${lobbyPlayerCount} jugadores)`
+        : `Esperando jugadores (${lobbyPlayerCount}/2)`;
+
+    waitingForHostEl.classList.toggle(
+        'hidden',
+        isSpectator || phase !== 'lobby'
+    );
+}
+
+// ============================================================
 // Role selection
+// ============================================================
 
 roleClientBtn.addEventListener('click', () => setRole('client'));
 roleHostBtn.addEventListener('click', () => setRole('host'));
@@ -120,9 +153,28 @@ function setRole(newRole) {
     } else if (phase === 'lobby') {
         startDiscoveryLoop();
     }
+
+    updateHostControls();
 }
 
+startGameBtn.addEventListener('click', () => {
+    if (!isSpectator || phase !== 'lobby') {
+        return;
+    }
+
+    if (lobbyPlayerCount < 2) {
+        setHostStatus('Se necesitan al menos 2 jugadores para iniciar.');
+        return;
+    }
+
+    startGameBtn.disabled = true;
+    setHostStatus('Iniciando cuenta regresiva...');
+    net.startGame();
+});
+
+// ============================================================
 // Bridge connection
+// ============================================================
 
 const net = new NetworkClient(BRIDGE_URL);
 
@@ -196,8 +248,10 @@ net.on('error', (msg) => {
     setHostStatus(text);
 });
 
-
+// ============================================================
 // Server discovery
+// ============================================================
+
 net.on('server_list', (msg) => {
     console.log('[UI] Server list received:', msg);
 
@@ -243,8 +297,9 @@ net.on('server_list', (msg) => {
     serverListEmptyEl.classList.toggle('hidden', visibleServers > 0);
 });
 
-
+// ============================================================
 // Manual connection
+// ============================================================
 
 manualConnectBtn.addEventListener('click', () => {
     const ip = manualIpInput.value.trim();
@@ -265,7 +320,10 @@ function attemptConnect(ip, tcpPort) {
     net.connectTo(ip, tcpPort);
 }
 
+// ============================================================
 // Host / spectator connection
+// ============================================================
+
 hostConnectBtn.addEventListener('click', () => {
     stopDiscoveryLoop();
 
@@ -273,7 +331,9 @@ hostConnectBtn.addEventListener('click', () => {
     net.connectTo('127.0.0.1', DEFAULT_TCP_PORT);
 });
 
+// ============================================================
 // Protocol messages
+// ============================================================
 
 net.on('welcome', (msg) => {
     console.log('[UI] welcome received:', msg);
@@ -282,7 +342,7 @@ net.on('welcome', (msg) => {
     config = msg.config || null;
 
     const text = isSpectator
-        ? 'Conectado como espectador. Esperando a que empiece la partida...'
+        ? 'Conectado como anfitrión. Espera a todos y presiona Iniciar partida.'
         : '¡Bienvenido! Esperando a que se complete el escuadrón...';
 
     setStatus(text);
@@ -302,6 +362,9 @@ net.on('lobby', (msg) => {
         id: normalizeId(player.id),
         name: String(player.name ?? '')
     }));
+
+    lobbyPlayerCount = normalizedRoster.length;
+    updateHostControls();
 
     playerNames.clear();
 
@@ -328,6 +391,7 @@ net.on('countdown', (msg) => {
     console.log('[UI] countdown received:', msg);
 
     phase = 'countdown';
+    updateHostControls();
     stopDiscoveryLoop();
 
     menuCountdownEl.classList.remove('hidden');
@@ -339,6 +403,7 @@ net.on('start', () => {
     console.log('[UI] start received.');
 
     phase = 'playing';
+    updateHostControls();
     stopDiscoveryLoop();
 
     menuCountdownEl.classList.add('hidden');
@@ -397,7 +462,9 @@ net.on('game_over', (msg) => {
     gameOverEl.textContent = winnerText;
 });
 
+// ============================================================
 // Lobby roster
+// ============================================================
 
 function renderSquadRoster(rosterPlayers) {
     const validPlayers = rosterPlayers.filter((player) => player.id !== null);
@@ -446,6 +513,7 @@ function returnToLobbyScreen() {
     menuEl.classList.remove('hidden');
 
     setStatus('De vuelta en la sala de espera.');
+    updateHostControls();
 
     for (const player of players.values()) {
         sceneManager?.removePlayer(player);
@@ -454,7 +522,9 @@ function returnToLobbyScreen() {
     players.clear();
 }
 
+// ============================================================
 // Scene and state synchronization
+// ============================================================
 
 function startScene() {
     hasEnteredGame = true;
@@ -545,7 +615,10 @@ function updateGrabPrompt(msg) {
     grabPromptEl.classList.toggle('hidden', distance > radius);
 }
 
+// ============================================================
 // Input and rendering loops
+// ============================================================
+
 function startInputLoop() {
     setInterval(() => {
         if (phase !== 'playing' || !inputHandler) {

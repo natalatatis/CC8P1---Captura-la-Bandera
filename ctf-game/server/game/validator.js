@@ -7,7 +7,7 @@ export const TICK_RATE = 20;
 
 // Server-side constants (not sent in welcome.config).
 export const COUNTDOWN_SECONDS = 5;
-export const MIN_PLAYERS = 2;           // protocol requirement: minimum players to trigger/keep countdown
+export const MIN_PLAYERS = 1;           // minimum to trigger/keep the countdown
 export const POST_GAME_SECONDS = 5;     // pause after game_over before back to lobby
 export const CIRCLE_CENTER = 500;       // = MAP_SIZE / 2
 export const SPAWN_RADIUS_MIN = 350;
@@ -35,7 +35,7 @@ export function distanceFromCenter(x, y) {
     return calculateDistance({ x, y }, { x: CIRCLE_CENTER, y: CIRCLE_CENTER });
 }
 
-// Half-away-from-zero rounding to 1 decimal
+// Half-away-from-zero rounding to 1 decimal, per section 2.3.2
 // ("redondeo half-away-from-zero"). toFixed() alone can land on
 // round-half-to-even for some floating point values, so we do it by hand.
 export function roundHalfAwayFromZero(num, decimals = 1) {
@@ -44,7 +44,7 @@ export function roundHalfAwayFromZero(num, decimals = 1) {
 }
 
 // Get new position after movement. Diagonals are normalized so speed is
-// identical in all 8 directions
+// identical in all 8 directions (section 3.3).
 export function getNewPosition(currentPos, dir, dt) {
     let dx = dir.x;
     let dy = dir.y;
