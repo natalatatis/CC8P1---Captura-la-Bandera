@@ -27,8 +27,6 @@ export class InputHandler {
 
     // Returns the raw direction intent as required by the protocol: each
     // axis is strictly -1, 0, or 1 (section 2.3.2 / 6.3). Diagonal
-    // normalization is the SERVER's job (section 4.1) — sending pre-divided
-    // fractional values like 0.707 would violate the "estrictamente enteros"
     // rule and get rejected with INVALID_FIELD.
     getDirection() {
         let dx = 0;

@@ -35,7 +35,7 @@ export function distanceFromCenter(x, y) {
     return calculateDistance({ x, y }, { x: CIRCLE_CENTER, y: CIRCLE_CENTER });
 }
 
-// Half-away-from-zero rounding to 1 decimal, per section 2.3.2
+// Half-away-from-zero rounding to 1 decimal
 // ("redondeo half-away-from-zero"). toFixed() alone can land on
 // round-half-to-even for some floating point values, so we do it by hand.
 export function roundHalfAwayFromZero(num, decimals = 1) {
@@ -44,7 +44,7 @@ export function roundHalfAwayFromZero(num, decimals = 1) {
 }
 
 // Get new position after movement. Diagonals are normalized so speed is
-// identical in all 8 directions (section 3.3).
+// identical in all 8 directions
 export function getNewPosition(currentPos, dir, dt) {
     let dx = dir.x;
     let dy = dir.y;

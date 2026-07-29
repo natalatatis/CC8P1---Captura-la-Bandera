@@ -1,11 +1,9 @@
-// client/src/Network.js
-//
 // This talks ONLY to our own local bridge (server/network/bridge.js) on
 // localhost, using the browser's built-in WebSocket — not the `ws` package,
 // and not the class protocol's transport. The real join/input/interact/
 // state/... messages that travel to the actual CTF server are carried
 // exactly as specified (TCP, JSON, '\n' framing) by the bridge, not by this
-// file. See bridge.js for the full explanation.
+// file.
 export class NetworkClient {
     constructor(bridgeUrl = 'ws://localhost:8890') {
         this.handlers = {};
@@ -52,7 +50,6 @@ export class NetworkClient {
 
     // spectator is a project-specific extension (not part of the class
     // protocol) — see gameSocket.js. Any other team's server will just
-    // ignore this unknown field per section 2.2, so it's always safe to send.
     join(name, spectator = false) {
         this._send({ type: 'join', v: 1, name, spectator });
     }

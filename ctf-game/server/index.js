@@ -12,11 +12,8 @@ const PROTOCOL_VERSION = 1;
 
 const gameState = new GameState();
 
-/*
- * ============================================================
- * TCP GAME SERVER
- * ============================================================
- */
+// TCP GAME SERVER
+ 
 
 const tcpServer = createGameServer(gameState);
 
@@ -176,12 +173,7 @@ udpServer.on('message', (messageBuffer, remoteInfo) => {
 
 udpServer.bind(DISCOVERY_PORT, DISCOVERY_HOST);
 
-/*
- * ============================================================
- * GAME LOOP
- * ============================================================
- */
-
+//GAME LOOP
 const tickIntervalMilliseconds = 1000 / gameState.TICK_RATE;
 
 const gameLoop = setInterval(() => {
@@ -192,11 +184,8 @@ const gameLoop = setInterval(() => {
     }
 }, tickIntervalMilliseconds);
 
-/*
- * ============================================================
- * GRACEFUL SHUTDOWN
- * ============================================================
- */
+//GRACEFUL SHUTDOWN
+
 
 function shutdown(signal) {
     console.log(`\n[SERVER] Received ${signal}. Closing server...`);

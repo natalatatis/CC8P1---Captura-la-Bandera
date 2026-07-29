@@ -3,9 +3,8 @@ import { Player } from './Player.js';
 import { InputHandler } from './inputHandler.js';
 import { NetworkClient } from './Network.js';
 
-// ============================================================
+
 // DOM references
-// ============================================================
 
 const menuEl = document.getElementById('menu');
 const hudEl = document.getElementById('hud');
@@ -39,18 +38,13 @@ const hostSectionEl = document.getElementById('hostSection');
 const hostConnectBtn = document.getElementById('hostConnectBtn');
 const hostStatusEl = document.getElementById('hostStatus');
 
-// ============================================================
-// Constants
-// ============================================================
 
+// Constants
 const BRIDGE_URL = 'ws://localhost:8890';
 const DEFAULT_TCP_PORT = 8889;
 const DISCOVERY_INTERVAL_MS = 2000;
 
-// ============================================================
 // Game state
-// ============================================================
-
 let sceneManager = null;
 let inputHandler = null;
 
@@ -68,10 +62,7 @@ let hasEnteredGame = false;
 
 let discoveryIntervalId = null;
 
-// ============================================================
 // Small helpers
-// ============================================================
-
 function setStatus(text) {
     menuStatusEl.textContent = text;
 }
@@ -110,9 +101,7 @@ function startDiscoveryLoop() {
     }, DISCOVERY_INTERVAL_MS);
 }
 
-// ============================================================
 // Role selection
-// ============================================================
 
 roleClientBtn.addEventListener('click', () => setRole('client'));
 roleHostBtn.addEventListener('click', () => setRole('host'));
@@ -133,9 +122,7 @@ function setRole(newRole) {
     }
 }
 
-// ============================================================
 // Bridge connection
-// ============================================================
 
 const net = new NetworkClient(BRIDGE_URL);
 
@@ -209,10 +196,8 @@ net.on('error', (msg) => {
     setHostStatus(text);
 });
 
-// ============================================================
-// Server discovery
-// ============================================================
 
+// Server discovery
 net.on('server_list', (msg) => {
     console.log('[UI] Server list received:', msg);
 
@@ -258,9 +243,8 @@ net.on('server_list', (msg) => {
     serverListEmptyEl.classList.toggle('hidden', visibleServers > 0);
 });
 
-// ============================================================
+
 // Manual connection
-// ============================================================
 
 manualConnectBtn.addEventListener('click', () => {
     const ip = manualIpInput.value.trim();
@@ -281,10 +265,7 @@ function attemptConnect(ip, tcpPort) {
     net.connectTo(ip, tcpPort);
 }
 
-// ============================================================
 // Host / spectator connection
-// ============================================================
-
 hostConnectBtn.addEventListener('click', () => {
     stopDiscoveryLoop();
 
@@ -292,9 +273,7 @@ hostConnectBtn.addEventListener('click', () => {
     net.connectTo('127.0.0.1', DEFAULT_TCP_PORT);
 });
 
-// ============================================================
 // Protocol messages
-// ============================================================
 
 net.on('welcome', (msg) => {
     console.log('[UI] welcome received:', msg);
@@ -418,9 +397,7 @@ net.on('game_over', (msg) => {
     gameOverEl.textContent = winnerText;
 });
 
-// ============================================================
 // Lobby roster
-// ============================================================
 
 function renderSquadRoster(rosterPlayers) {
     const validPlayers = rosterPlayers.filter((player) => player.id !== null);
@@ -477,9 +454,7 @@ function returnToLobbyScreen() {
     players.clear();
 }
 
-// ============================================================
 // Scene and state synchronization
-// ============================================================
 
 function startScene() {
     hasEnteredGame = true;
@@ -570,10 +545,7 @@ function updateGrabPrompt(msg) {
     grabPromptEl.classList.toggle('hidden', distance > radius);
 }
 
-// ============================================================
 // Input and rendering loops
-// ============================================================
-
 function startInputLoop() {
     setInterval(() => {
         if (phase !== 'playing' || !inputHandler) {

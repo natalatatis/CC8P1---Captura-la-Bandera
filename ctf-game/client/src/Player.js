@@ -56,7 +56,7 @@ export class Player {
     }
 
     // (Re)builds the floating nametag. Cheap enough to call whenever the
-    // name becomes known/changes (e.g. once the 'lobby' broadcast arrives).
+    // name becomes known/changes 
     setName(name) {
         if (!name || name === this.name && this.nameSprite) return;
         this.name = name;

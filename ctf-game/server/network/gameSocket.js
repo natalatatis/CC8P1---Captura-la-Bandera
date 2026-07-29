@@ -10,9 +10,8 @@ const PROTOCOL_VERSION = 1;
 
 const CONTROL_CHARS_RE = /[\u0000-\u001F\u007F]/;
 
-/*
- * Safely sends one compact JSON message followed by exactly one newline.
- */
+// Safely sends one compact JSON message followed by exactly one newline.
+ 
 function sendMsg(socket, message) {
     if (!socket || socket.destroyed || !socket.writable) {
         console.warn(

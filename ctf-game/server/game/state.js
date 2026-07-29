@@ -37,8 +37,7 @@ export class GameState extends EventEmitter {
         // insideCircle tracks whether the *current carrier* was at distance
         // <= VICTORY_RADIUS the last time we checked (at capture/steal time,
         // and every tick afterwards). Victory only fires on the transition
-        // true -> false (section 3.3 / 5.3: a thief who grabs the flag while
-        // already outside does NOT win instantly).
+        // true -> false 
         this.flag = {
             x: this.CENTRAL_COORD,
             y: this.CENTRAL_COORD,
@@ -53,10 +52,8 @@ export class GameState extends EventEmitter {
         this.postGameTimer = 0;
 
         // Interact requests are queued and only resolved after movement +
-        // victory are evaluated for the tick (section 4.1: "el servidor
-        // aplica primero el movimiento y la condición de victoria, y
-        // después procesa las interacciones pendientes"). This also makes
-        // TCP arrival order the one and only tie-break rule (section 5.3).
+        // victory are evaluated for the tick. This also makes
+        // TCP arrival order the one and only tie-break rule 
         this.pendingInteracts = [];
     }
 
@@ -174,7 +171,6 @@ export class GameState extends EventEmitter {
 
         if (this.countdown <= 0) {
             // Spawn is assigned here, at 'start' time, not at join time
-            // (section 3.3): uniform random point on the ring R∈[350,450].
             for (const player of this.players.values()) {
                 const spawn = randomSpawnPosition();
                 player.x = spawn.x;
@@ -200,7 +196,7 @@ export class GameState extends EventEmitter {
             }
         }
 
-        // 2) Victory condition, evaluated before interactions (section 4.1).
+        // 2) Victory condition, evaluated before interactions
         if (this.flag.owner) {
             const carrier = this.players.get(this.flag.owner);
 
